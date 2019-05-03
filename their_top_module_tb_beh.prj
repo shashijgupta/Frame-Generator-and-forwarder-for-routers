@@ -1,0 +1,5 @@
+vhdl work "ipcore_dir/fifo.vhd"
+vhdl work "ipcore_dir/fifo_port.vhd"
+vhdl work "demux.vhd"
+vhdl work "main.vhd"
+vhdl work "main_tb.vhd"

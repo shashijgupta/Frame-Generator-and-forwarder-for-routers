@@ -1,0 +1,1 @@
+-intstyle "ise" -incremental -lib "secureip" -o "/home/shashij/arbiter/endgame-project/their_top_module_tb_isim_beh.exe" -prj "/home/shashij/arbiter/endgame-project/their_top_module_tb_beh.prj" "work.their_top_module_tb" 

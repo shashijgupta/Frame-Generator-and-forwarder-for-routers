@@ -1,0 +1,4 @@
+work	"demux.vhd"
+work	"ipcore_dir/fifo.vhd"
+work	"ipcore_dir/fifo_port.vhd"
+work	"main.vhd"
