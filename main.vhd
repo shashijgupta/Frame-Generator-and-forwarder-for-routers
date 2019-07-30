@@ -38,7 +38,7 @@ entity main is
            Rd_opcode : out  STD_LOGIC;
            CFM_information : in  STD_LOGIC_VECTOR (255 downto 0);
            CFM_Sequence_number : in  STD_LOGIC_VECTOR (15 downto 0);
-           CFM_Output_port : in  STD_LOGIC_VECTOR (31 downto 0);
+           CFM_Output_port : in  STD_LOGIC_VECTOR (4 downto 0);
            Gen_CFM : in  STD_LOGIC;
            CFM_sent : out  STD_LOGIC;
            Wr_Sequence_number : in  STD_LOGIC_VECTOR (15 downto 0);
@@ -95,7 +95,7 @@ component demux5to32
            output : out  STD_LOGIC_VECTOR (31 downto 0));
 end component;
 			  
-type states is (idle, reading, forward, hello_ack, last);
+type states is (idle, reading, forward, hello_ack,hello_for, last, cfm_gen, ack_gen1, ack_gen2, ack_for, cfm_gen1, cfm_gen2,cfm_for, ack_gen, last1);
 signal p_state, n_state : states := idle;
 signal rst, full, almost_full, empty, prog_full, fsm_bsy, wr_en0, rd_en0, wr_en1, rd_en1 : std_logic := '0';
 signal dout_data : std_logic_vector(143 downto 0) := (others => '0');
@@ -109,9 +109,20 @@ signal cur_port_working : std_logic_vector(4 downto 0) := (others => '0');
 signal cur_port_working_mask : std_logic_vector(31 downto 0) := (others => '0');
 signal cur_port_sending : std_logic_vector(4 downto 0) := (others => '0');
 signal cur_port_sending_int : integer := 0;
-signal ack : std_logic_vector(2719 downto 0);
+signal ack : std_logic_vector(2719 downto 0) := (others => '0');
+signal help_ack_valid : std_logic_vector(3059 downto 0) := (others => '0');
 signal cur_unit : std_logic_vector(4 downto 0) := (others => '0');
 signal cur_unit_int : integer := 0;
+signal cfm_packet : std_logic_vector(191 downto 0) := (others => '0');
+signal cfm_packet_valid : std_logic_vector(215 downto 0) := (others => '0');
+signal cfm_port_mask : std_logic_vector(31 downto 0) := (others => '0'); 
+signal ack_packet : std_logic_vector(143 downto 0) := (others => '0');
+signal ack_packet_valid : std_logic_vector(161 downto 0) := (others => '0');
+signal ack_port_mask : std_logic_vector(31 downto 0) := (others => '0');
+signal null_vec : std_logic_vector(71 downto 0) := (others => '0');
+signal null_vec1 : std_logic_vector(107 downto 0) := (others => '0');
+signal null_vec2 : std_logic_vector(125 downto 0) := (others => '0');
+
 begin
 DUT0 : demux5to32 PORT MAP (
 						Selecti => Input_Port,
@@ -122,6 +133,16 @@ DUT1 : demux5to32 PORT MAP (
 						Selecti => cur_port_working,
 						output => cur_port_working_mask
 						);
+
+DUT2 : demux5to32 PORT MAP (
+						Selecti => CFM_Output_port,
+						output => cfm_port_mask
+						);
+						
+DUT3 : demux5to32 PORT MAP (
+						Selecti => Wr_Output_port,
+						output => ack_port_mask
+						);						
 						
 process(clk)
 begin
@@ -145,6 +166,10 @@ end if;
 else 
 n_state <= idle;
 end if;
+elsif Gen_CFM = '1' then
+n_state <= cfm_gen;
+elsif Send_wr_ACK = '1' then
+n_state <= ack_gen;
 else
 n_state <= idle;
 end if;
@@ -153,7 +178,7 @@ when reading =>
 n_state <= forward;
 
 when forward =>
-if iData = 0 then
+if iData(0) = '0' AND iData(8) = '0' AND iData(16) = '0' AND iData(24) = '0' AND iData(32) = '0' AND iData(40) = '0' AND iData(48) = '0' AND iData(56) = '0' AND iData(64) = '0' AND iData(72) = '0' AND iData(80) = '0' AND iData(88) = '0' AND iData(96) = '0' AND iData(104) = '0' AND iData(112) = '0' AND iData(120) = '0' AND iData(128) = '0' AND iData(136) = '0'  then
 n_state <= hello_ack;
 else
 n_state <= forward;
@@ -167,11 +192,41 @@ n_state <= hello_ack;
 end if;
 
 when last =>
-if cur_unit = 18 then
+n_state < hello_for;
+
+when hello_for =>
+n_state <= last1;
+
+when last1 =>
+if cur_unit = 21 then
 n_state <= idle;
 else
-n_state <= last;
+n_state <= last1;
 end if;
+
+when cfm_gen =>
+n_state <= cfm_for;
+
+when cfm_for =>
+n_state <= cfm_gen1;
+
+when cfm_gen1 =>
+n_state <= cfm_gen2;
+
+when cfm_gen2 =>
+n_state <= idle;
+
+when ack_gen =>
+n_state <= ack_for;
+
+when ack_for =>
+n_state <= ack_gen1;
+
+when ack_gen1 =>
+n_state <= ack_gen2;
+
+when ack_gen2 =>
+n_state <= idle;
 
 when others =>
 n_state <= idle;
@@ -180,6 +235,12 @@ end case;
 end process;
 
 process(clk)
+variable ack_help1 : integer := 3059;
+variable ack_help2 : integer := 2719;
+variable help1 : integer := 161;
+variable help2 : integer := 143;
+variable cfm_help1 : integer := 215;
+variable cfm_help2 : integer := 191;
 begin
 if rising_edge(clk) then
 case p_state is 
@@ -200,16 +261,13 @@ cur_port_working <= Input_Port;
 when forward =>
 dout_port <= core_ports and (not temp_dout_port);
 dout_data <= iData;
-if iData = 0 then
-wr_en0 <= '0';
-wr_en1 <= '0';
-else
 wr_en0 <= '1';
 wr_en1 <= '1';
-end if;
 
 
 when hello_ack =>
+wr_en0 <= '0';
+wr_en1 <= '0';
 if cur_port = 0 then
 cur_port_sending <= cur_port;
 cur_port <= cur_port + 1;
@@ -227,36 +285,105 @@ ack(2719 downto 2672) <= Port_info(63 downto 16);
 end if;
 cur_port_sending <= cur_port;
 cur_port <= cur_port + 1;
+else
+cur_port_sending <= cur_port_sending;
+cur_port <= cur_port;
 end if;
 end if; 
 
 when last =>
-if cur_port_sending_int = 2480 then
-if Port_info_valid = '1' then
-ack((2559 - cur_port_sending_int) downto (2480 - cur_port_sending_int)) <= Port_info;
+--if Port_info_valid = '1' then
+ack(79 downto 0) <= (others => '0');
 cur_port_sending_int <= cur_port_sending_int + 80;
 if cur_port_sending = cur_port_working then
 ack(2719 downto 2672) <= Port_info(63 downto 16);
 end if;
-end if;
-end if;
+--else
+--ack(79 downto 0) <= (others => '0');
+--cur_port_sending <= cur_port_sending;
+--cur_port <= cur_port;
+--end if;
 
-if cur_unit = 18 then
-dout_data <= ack(127 downto 0) & "0000000000000000";
+when hello_for =>
+for j in 0 to 339 loop
+help_ack_valid(3059 - (j)*9) <= '1';
+help_ack_valid((3058 - (j)*9) downto (3051 - (j)*9)) <= ack((2719 - (j)*8) downto (2712 - (j)*8));
+ack_help1 := ack_help1 - 9;
+ack_help2 := ack_help2 - 8;
+end loop;
+
+when last1 =>
+if cur_unit = 21 then
+dout_data <= help_ack_valid(35 downto 0) & null_vec1;
 dout_port <= cur_port_working_mask;
 cur_port_working <= (others => '0');
 cur_port <= (others => '0');
 cur_port_sending <= (others => '0');
+cur_unit_int <= 0;
 --cur_port_working_mask <= (others => '0');
 fsm_bsy <= '0';
 else
-dout_data <= ack((2719 - cur_unit_int) downto (2576 - cur_unit_int));
+dout_data <= help_ack_valid((3059 - cur_unit_int) downto (2916 - cur_unit_int));
 cur_unit_int <= cur_unit_int + 144;
 cur_unit <= cur_unit + 1;
 dout_port <= cur_port_working_mask;
 end if;
 wr_en0 <= '1';
 wr_en1 <= '1';
+
+when cfm_gen =>
+cfm_packet(191 downto 64) <= CFM_information(255 downto 128);
+cfm_packet(63 downto 48) <= CFM_sequence_number;
+cfm_packet(47 downto 0) <= CFM_information(127 downto 80);
+
+when cfm_for =>
+for j in 0 to 23 loop
+cfm_packet_valid(215 - (j)*9) <= '1';
+cfm_packet_valid((214 - (j)*9) downto (207 - (j)*9)) <= cfm_packet((191 - (j) * 8) downto (184 - (j)*8));
+cfm_help1 := cfm_help1 - 9;
+cfm_help2 := cfm_help2 - 8;
+end loop;
+
+
+
+when cfm_gen1 =>
+dout_data <= cfm_packet_valid(215 downto 72);
+dout_port <= cfm_port_mask;
+wr_en0 <= '1';
+wr_en1 <= '1';
+
+when cfm_gen2 =>
+dout_data <= cfm_packet_valid(71 downto 0) & null_vec;
+dout_port <= cfm_port_mask;
+wr_en0 <= '1';
+wr_en1 <= '1';
+
+
+when ack_gen =>
+ack_packet(143 downto 96) <= (others => '1');
+ack_packet(95 downto 48) <= MAC;
+ack_packet(15 downto 0) <= Wr_Sequence_number;
+
+when ack_for =>
+for j in 0 to 17 loop
+ack_packet_valid(161 - (j)*9) <= '1';
+ack_packet_valid((160 - (j)*9) downto (153 - (j)*9)) <= ack_packet((143 - (j)*8) downto (136 - (j)*8));
+help1 := help1 - 9;
+help2 := help2 - 8;
+end loop;
+
+when ack_gen1 =>
+dout_data <= ack_packet_valid(161 downto 18);
+dout_port <= ack_port_mask;
+wr_en0 <= '1';
+wr_en1 <= '1'; 
+
+when ack_gen2 =>
+dout_data <= ack_packet_valid(17 downto 0) & null_vec2;
+dout_port <= ack_port_mask;
+wr_en0 <= '1';
+wr_en1 <= '1';
+
 when others =>
 fsm_bsy <= '0';
 end case;
@@ -308,7 +435,7 @@ Port_number <= (others => '0');
 Read_port_info <= '0';
 
 when forward =>
-if iData = 0 then
+if iData(0) = '0' AND iData(8) = '0' AND iData(16) = '0' AND iData(24) = '0' AND iData(32) = '0' AND iData(40) = '0' AND iData(48) = '0' AND iData(56) = '0' AND iData(64) = '0' AND iData(72) = '0' AND iData(80) = '0' AND iData(88) = '0' AND iData(96) = '0' AND iData(104) = '0' AND iData(112) = '0' AND iData(120) = '0' AND iData(128) = '0' AND iData(136) = '0'  then
 iRd_data <= '0';
 Rd_opcode <= '0';
 CFM_sent <= '0';
@@ -337,7 +464,25 @@ Port_number <= cur_port;
 Read_port_info <= '1';
 
 when last =>
-if cur_unit = 18 then
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '0';
+Ack_sent <= '0';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
+when hello_for =>
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '0';
+Ack_sent <= '0';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
+when last1 =>
+if cur_unit = 21 then
 iRd_data <= '0';
 Rd_opcode <= '1';
 CFM_sent <= '0';
@@ -345,7 +490,6 @@ Ack_sent <= '0';
 oData_av <= not empty;
 Port_number <= (others => '0');
 Read_port_info <= '0';
-
 else
 iRd_data <= '0';
 Rd_opcode <= '0';
@@ -355,6 +499,79 @@ oData_av <= not empty;
 Port_number <= (others => '0');
 Read_port_info <= '0';
 end if;
+
+when cfm_gen =>
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '0';
+Ack_sent <= '0';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
+when cfm_for =>
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '0';
+Ack_sent <= '0';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
+when cfm_gen1 =>
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '0';
+Ack_sent <= '0';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
+when cfm_gen2 =>
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '1';
+Ack_sent <= '0';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
+when ack_gen =>
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '0';
+Ack_sent <= '0';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
+when ack_for =>
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '0';
+Ack_sent <= '0';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
+when ack_gen1 =>
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '0';
+Ack_sent <= '0';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
+when ack_gen2 =>
+iRd_data <= '0';
+Rd_opcode <= '0';
+CFM_sent <= '0';
+Ack_sent <= '1';
+oData_av <= not empty;
+Port_number <= (others => '0');
+Read_port_info <= '0';
+
 end case;
 end if;
 end process;

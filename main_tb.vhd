@@ -54,7 +54,7 @@ ARCHITECTURE behavior OF their_top_module_tb IS
           Rd_opcode : OUT  std_logic;
           CFM_information : IN  std_logic_vector(255 downto 0);
           CFM_Sequence_number : IN  std_logic_vector(15 downto 0);
-          CFM_Output_port : IN  std_logic_vector(31 downto 0);
+          CFM_Output_port : IN  std_logic_vector(4 downto 0);
           Gen_CFM : IN  std_logic;
           CFM_sent : OUT  std_logic;
           Wr_Sequence_number : IN  std_logic_vector(15 downto 0);
@@ -85,7 +85,7 @@ ARCHITECTURE behavior OF their_top_module_tb IS
 => '0');
     signal CFM_Sequence_number : std_logic_vector(15 downto 0) := 
 (others => '0');
-    signal CFM_Output_port : std_logic_vector(31 downto 0) := (others => 
+    signal CFM_Output_port : std_logic_vector(4 downto 0) := (others => 
 '0');
     signal Gen_CFM : std_logic := '0';
     signal Wr_Sequence_number : std_logic_vector(15 downto 0) := (others 
@@ -115,7 +115,7 @@ ARCHITECTURE behavior OF their_top_module_tb IS
     -- Clock period definitions
     constant clk_period : time := 10 ns;
 
-BEGIN
+BEGIN 
 
         -- Instantiate the Unit Under Test (UUT)
     uut: main PORT MAP (
@@ -174,6 +174,67 @@ BEGIN
                 Gen_CFM <= '0';
                 Wr_Sequence_number <= (others => '0');
                 Wr_output_port <= (others => '0');
+                Send_wr_ACK <= '1';
+                MAC <= (others => '1');
+                oRd_data <= '1';
+                Port_info <= (others => '0');
+                Port_info_valid <= '1';
+                Core_ports <= (12|13|14 => '1',  others => '0');
+                ---giving data for 50 clk cycles
+					 
+                wait for clk_period * 4;
+					 
+					  iData_av <= '1';
+                iData <= (others => '0');
+                Input_Port <= (4|3|1 => '1', others => '0');
+                Opcode <= "001";
+                CFM_information <= (others => '0');
+                CFM_Sequence_number <= (others => '0');
+                CFM_Output_port <= (others => '0');
+                Gen_CFM <= '0';
+                Wr_Sequence_number <= (others => '0');
+                Wr_output_port <= (others => '0');
+                Send_wr_ACK <= '1';
+                MAC <= (others => '1');
+                oRd_data <= '1';
+                Port_info <= (others => '0');
+                Port_info_valid <= '1';
+                Core_ports <= (12|13|14 => '1',  others => '0');
+                ---giving data for 50 clk cycles
+					 
+                wait for clk_period * 56;
+					 
+					 
+					 iData_av <= '0';
+                iData <= (others => '0');
+                Input_Port <= (4|3|1 => '1', others => '0');
+                Opcode <= "001";
+                CFM_information <= (others => '0');
+                CFM_Sequence_number <= (others => '0');
+                CFM_Output_port <= (others => '0');
+                Gen_CFM <= '0';
+                Wr_Sequence_number <= (others => '0');
+                Wr_output_port <= (others => '0');
+                Send_wr_ACK <= '1';
+                MAC <= (others => '1');
+                oRd_data <= '0';
+                Port_info <= (others => '0');
+                Port_info_valid <= '1';
+                Core_ports <= (12|13|14 => '1',  others => '0');
+                ---giving data for 50 clk cycles
+					 
+                wait for clk_period * 5;
+					 
+					 iData_av <= '0';
+                iData <= (others => '0');
+                Input_Port <= (4|3|1 => '1', others => '0');
+                Opcode <= "001";
+                CFM_information <= (others => '0');
+                CFM_Sequence_number <= (others => '0');
+                CFM_Output_port <= (others => '0');
+                Gen_CFM <= '1';
+                Wr_Sequence_number <= (others => '0');
+                Wr_output_port <= (others => '0');
                 Send_wr_ACK <= '0';
                 MAC <= (others => '1');
                 oRd_data <= '0';
@@ -182,7 +243,7 @@ BEGIN
                 Core_ports <= (12|13|14 => '1',  others => '0');
                 ---giving data for 50 clk cycles
 					 
-                wait for clk_period;
+                wait for clk_period * 5;
 					iData_av <= '1';
                 iData <= (others => '1');
                 Input_Port <= (4|3|1 => '1', others => '0');
@@ -194,7 +255,7 @@ BEGIN
                 Wr_Sequence_number <= (others => '0');
                 Wr_output_port <= (others => '0');
                 Send_wr_ACK <= '0';
-                MAC <= (others => '1');
+                MAC <= (others => '0');
                 oRd_data <= '1';
                 Port_info <= (others => '0');
                 Port_info_valid <= '0';
@@ -213,7 +274,7 @@ BEGIN
                 Wr_Sequence_number <= (others => '0');
                 Wr_output_port <= (others => '0');
                 Send_wr_ACK <= '0';
-                MAC <= (others => '1');
+                MAC <= (others => '0');
                 oRd_data <= '1';
                 Port_info <= (others => '0');
                 Port_info_valid <= '0';
@@ -235,7 +296,7 @@ BEGIN
                 Wr_Sequence_number <= (others => '0');
                 Wr_output_port <= (others => '0');
                 Send_wr_ACK <= '0';
-                MAC <= (others => '1');
+                MAC <= (others => '0');
                 oRd_data <= '1';
                 Port_info <= (others => '1');
                 Port_info_valid <= '1';
